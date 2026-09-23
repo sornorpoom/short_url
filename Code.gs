@@ -125,26 +125,26 @@ function processShortenUrl(longUrl, topic) {
 }
 
 /**
- * บริการย่อ URL แบบ Multi-API Pipeline (TinyURL -> CleanURI -> Ulvis -> Clck.ru)
- * รับประกันได้ลิงก์ที่ย่อสั้นลงจริงทุกครั้ง
+ * บริการย่อ URL แบบ Direct Redirect (Ulvis -> CleanURI -> Clck.ru)
+ * ปลอดโฆษณา 100% ไม่มีหน้าคั่น Preview สแกนหรือคลิกแล้วเด้งเข้าเว็บทันที
  */
 function callShortenerApi(longUrl) {
-  // อันดับ 1: TinyURL API
+  // อันดับ 1: Ulvis API (Direct 301 Redirect ปลอดโฆษณา 100%)
   try {
-    const tinyUrlEndpoint = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`;
-    const response = UrlFetchApp.fetch(tinyUrlEndpoint, { muteHttpExceptions: true, followRedirects: true });
-    if (response.getResponseCode() === 200) {
-      const result = response.getContentText().trim();
-      if (result.startsWith('http://') || result.startsWith('https://')) {
-        Logger.log('Shortened with TinyURL: ' + result);
-        return result;
+    const ulvisEndpoint = `https://ulvis.net/API/write/get?url=${encodeURIComponent(longUrl)}`;
+    const response1 = UrlFetchApp.fetch(ulvisEndpoint, { muteHttpExceptions: true });
+    if (response1.getResponseCode() === 200) {
+      const json1 = JSON.parse(response1.getContentText());
+      if (json1 && json1.success && json1.data && json1.data.url) {
+        Logger.log('Shortened with Ulvis (No Ads): ' + json1.data.url);
+        return json1.data.url;
       }
     }
-  } catch (e) {
-    Logger.log('TinyURL API Error: ' + e);
+  } catch (e1) {
+    Logger.log('Ulvis API Error: ' + e1);
   }
 
-  // อันดับ 2: CleanURI API
+  // อันดับ 2: CleanURI API (Direct 301 Redirect ปลอดโฆษณา 100%)
   try {
     const cleanUriEndpoint = 'https://cleanuri.com/api/v1/shorten';
     const options = {
@@ -154,44 +154,29 @@ function callShortenerApi(longUrl) {
     };
     const response2 = UrlFetchApp.fetch(cleanUriEndpoint, options);
     if (response2.getResponseCode() === 200) {
-      const json = JSON.parse(response2.getContentText());
-      if (json && json.result_url) {
-        Logger.log('Shortened with CleanURI: ' + json.result_url);
-        return json.result_url;
+      const json2 = JSON.parse(response2.getContentText());
+      if (json2 && json2.result_url) {
+        Logger.log('Shortened with CleanURI (No Ads): ' + json2.result_url);
+        return json2.result_url;
       }
     }
   } catch (e2) {
     Logger.log('CleanURI API Error: ' + e2);
   }
 
-  // อันดับ 3: Ulvis API
-  try {
-    const ulvisEndpoint = `https://ulvis.net/API/write/get?url=${encodeURIComponent(longUrl)}`;
-    const response3 = UrlFetchApp.fetch(ulvisEndpoint, { muteHttpExceptions: true });
-    if (response3.getResponseCode() === 200) {
-      const json3 = JSON.parse(response3.getContentText());
-      if (json3 && json3.success && json3.data && json3.data.url) {
-        Logger.log('Shortened with Ulvis: ' + json3.data.url);
-        return json3.data.url;
-      }
-    }
-  } catch (e3) {
-    Logger.log('Ulvis API Error: ' + e3);
-  }
-
-  // อันดับ 4: Clck.ru API
+  // อันดับ 3: Clck.ru API (Direct Redirect ปลอดโฆษณา 100%)
   try {
     const clckEndpoint = `https://clck.ru/--?url=${encodeURIComponent(longUrl)}`;
-    const response4 = UrlFetchApp.fetch(clckEndpoint, { muteHttpExceptions: true });
-    if (response4.getResponseCode() === 200) {
-      const resText = response4.getContentText().trim();
+    const response3 = UrlFetchApp.fetch(clckEndpoint, { muteHttpExceptions: true });
+    if (response3.getResponseCode() === 200) {
+      const resText = response3.getContentText().trim();
       if (resText.startsWith('http')) {
-        Logger.log('Shortened with Clck.ru: ' + resText);
+        Logger.log('Shortened with Clck.ru (No Ads): ' + resText);
         return resText;
       }
     }
-  } catch (e4) {
-    Logger.log('Clck.ru API Error: ' + e4);
+  } catch (e3) {
+    Logger.log('Clck.ru API Error: ' + e3);
   }
 
   return longUrl;

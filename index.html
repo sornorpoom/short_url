@@ -504,9 +504,9 @@
       }
     }
 
-    // ย่อลิงก์ฝั่ง Client (Multi-provider Fallback)
+    // ย่อลิงก์ฝั่ง Client (Ulvis -> Clck.ru) ปลอดโฆษณา 100%
     async function clientShortenUrl(url) {
-      // 1. ลองผ่าน Ulvis API (เปิดรับ CORS)
+      // 1. ลองผ่าน Ulvis API (Direct 301 Redirect ปลอดโฆษณา 100%)
       try {
         const res = await fetch(`https://ulvis.net/API/write/get?url=${encodeURIComponent(url)}`);
         if (res.ok) {
@@ -519,25 +519,14 @@
         console.warn('Ulvis failed, trying next...');
       }
 
-      // 2. ลองผ่าน TinyURL API
+      // 2. ลองผ่าน Clck.ru API (Direct Redirect ปลอดโฆษณา 100%)
       try {
-        const res2 = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+        const res2 = await fetch(`https://clck.ru/--?url=${encodeURIComponent(url)}`);
         if (res2.ok) {
-          const text = await res2.text();
-          if (text && text.startsWith('http')) return text.trim();
+          const text2 = await res2.text();
+          if (text2 && text2.startsWith('http')) return text2.trim();
         }
       } catch (e2) {
-        console.warn('TinyURL failed, trying next...');
-      }
-
-      // 3. ลองผ่าน Clck.ru API
-      try {
-        const res3 = await fetch(`https://clck.ru/--?url=${encodeURIComponent(url)}`);
-        if (res3.ok) {
-          const text3 = await res3.text();
-          if (text3 && text3.startsWith('http')) return text3.trim();
-        }
-      } catch (e3) {
         console.warn('Clck.ru failed');
       }
 
