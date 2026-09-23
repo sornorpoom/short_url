@@ -327,6 +327,12 @@
     let allLinksHistory = []; // เก็บประวัติทั้งหมดเพื่อการค้นหาและการจัดเรียง
     const STORAGE_KEY = 'gas_url_shortener_recent_links_v1';
     const GAS_API_KEY = 'gas_url_shortener_api_endpoint_v1';
+    // Web App URL เริ่มต้นที่เชื่อมต่อกับ Google Spreadsheet ID: 19lTnU0PZMlUEAleqfiHEvNks2HBqbbrfFMj5Mwv0R98
+    const DEFAULT_GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxIQdCgQqW6iTuktISrVZwB6XYT7DCRC4byoq5_RYl__AI3cwMa8pyPc-OJd_i1z0OI/exec';
+
+    function getGasApiUrl() {
+      return localStorage.getItem(GAS_API_KEY) || DEFAULT_GAS_API_URL;
+    }
 
     // เมื่อโหลดหน้าเว็บเสร็จ
     window.addEventListener('DOMContentLoaded', () => {
@@ -363,7 +369,7 @@
     // ตรวจสอบและอัปเดตปุ่มสถานะ API
     function updateApiStatusBadge() {
       const isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
-      const apiEndpoint = localStorage.getItem(GAS_API_KEY) || '';
+      const apiEndpoint = getGasApiUrl();
       const dot = document.getElementById('apiStatusDot');
       const text = document.getElementById('apiStatusText');
       const input = document.getElementById('gasApiInput');
@@ -373,8 +379,8 @@
         if (dot) { dot.className = 'fa-solid fa-circle-check text-emerald-500 mr-1.5'; }
         if (text) { text.textContent = 'ทำงานใน GAS (เชื่อมต่อ Sheet อัตโนมัติ)'; }
       } else if (apiEndpoint) {
-        if (dot) { dot.className = 'fa-solid fa-circle-check text-indigo-500 mr-1.5'; }
-        if (text) { text.textContent = 'เชื่อมต่อ GAS API แล้ว'; }
+        if (dot) { dot.className = 'fa-solid fa-circle-check text-emerald-500 mr-1.5'; }
+        if (text) { text.textContent = 'เชื่อมต่อ Google Sheet แล้ว ✅'; }
       } else {
         if (dot) { dot.className = 'fa-solid fa-circle-exclamation text-amber-500 mr-1.5'; }
         if (text) { text.textContent = 'ตั้งค่า GAS API (เพื่อให้ลง Sheet)'; }
@@ -459,8 +465,8 @@
           return;
         }
 
-        // กรณีที่ 2: รันบน Vercel / GitHub Pages แต่มีการระบุ Google Apps Script Web App URL
-        const gasApiUrl = localStorage.getItem(GAS_API_KEY);
+        // กรณีที่ 2: รันบน Vercel / GitHub Pages (ส่งไปยัง Google Apps Script Web App API)
+        const gasApiUrl = getGasApiUrl();
         if (gasApiUrl && gasApiUrl.startsWith('http')) {
           try {
             const endpoint = `${gasApiUrl}${gasApiUrl.includes('?') ? '&' : '?'}action=shorten&url=${encodeURIComponent(longUrl)}&topic=${encodeURIComponent(topic)}`;
@@ -477,7 +483,7 @@
           }
         }
 
-        // กรณีที่ 3: ย่อผ่าน Client Multi-Shortener
+        // กรณีที่ 3: Fallback ย่อผ่าน Client Multi-Shortener
         const shortUrl = await clientShortenUrl(longUrl);
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shortUrl)}`;
         
@@ -656,8 +662,8 @@
         return;
       }
 
-      // 2. ถ้าอยู่บน Vercel / GitHub และมีการตั้งค่า GAS API
-      const gasApiUrl = localStorage.getItem(GAS_API_KEY);
+      // 2. ถ้าอยู่บน Vercel / GitHub
+      const gasApiUrl = getGasApiUrl();
       if (gasApiUrl && gasApiUrl.startsWith('http')) {
         try {
           const endpoint = `${gasApiUrl}${gasApiUrl.includes('?') ? '&' : '?'}action=getLinks&limit=100`;
