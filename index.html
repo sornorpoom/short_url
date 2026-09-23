@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบย่อ URL & สร้าง QR Code | Google Apps Script</title>
+  <!-- Google Fonts: Prompt & Kanit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'Kanit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Prompt', 'Kanit', sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgb(240, 249, 255) 0%, rgb(238, 242, 255) 50.2%, rgb(245, 243, 255) 90%);
+      min-height: 100vh;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased p-4 md:p-8 flex flex-col justify-between min-h-screen">
+
+  <div class="max-w-4xl mx-auto w-full">
+    <!-- Header -->
+    <header class="text-center mb-8">
+      <div class="inline-flex items-center justify-center p-3.5 bg-gradient-to-tr from-teal-500 via-teal-600 to-indigo-600 rounded-2xl text-white shadow-lg mb-4">
+        <i class="fa-solid fa-link text-2xl mr-2"></i>
+        <i class="fa-solid fa-qrcode text-2xl"></i>
+      </div>
+      <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-teal-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent font-['Kanit']">
+        ระบบย่อลิงก์ & สร้าง QR Code
+      </h1>
+      <p class="text-slate-500 mt-2 text-sm md:text-base">
+        แปลง URL ยาวของ Google Apps Script หรือเว็บทั่วไปให้สั้นลง พร้อมสร้าง QR Code และบันทึกลง Google Sheet ทันที
+      </p>
+      
+      <!-- Link to Google Sheet -->
+      <div class="mt-3 flex flex-wrap justify-center items-center gap-2">
+        <a href="https://docs.google.com/spreadsheets/d/19lTnU0PZMlUEAleqfiHEvNks2HBqbbrfFMj5Mwv0R98/edit?usp=sharing" target="_blank" 
+           class="inline-flex items-center text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3.5 py-1.5 rounded-full shadow-sm transition">
+          <i class="fa-solid fa-table text-emerald-600 mr-1.5"></i> ตรวจสอบข้อมูลใน Google Spreadsheet
+          <i class="fa-solid fa-arrow-up-right-from-square ml-1.5 text-[10px]"></i>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Card -->
+    <div class="glass-card rounded-3xl p-6 md:p-8 shadow-xl border border-slate-100">
+      
+      <!-- Input Form -->
+      <form id="shortenerForm" onsubmit="handleSubmit(event)" class="space-y-4">
+        
+        <!-- Long URL Input -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">
+            <i class="fa-solid fa-link text-teal-600 mr-1.5"></i> ลิงก์ที่ต้องการย่อ (Url / Google Apps Script Web App URL) <span class="text-rose-500">*</span>
+          </label>
+          <div class="relative">
+            <input type="url" id="longUrl" required placeholder="https://script.google.com/macros/s/.../exec หรือ https://example.com" 
+                   class="w-full pl-4 pr-12 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/90 text-sm md:text-base" />
+            <button type="button" onclick="pasteClipboard()" title="วางจากคลิปบอร์ด"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-teal-600 transition">
+              <i class="fa-regular fa-paste text-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Topic Input -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">
+            <i class="fa-solid fa-tag text-indigo-600 mr-1.5"></i> หัวข้อ / เรื่อง (Topic) <span class="text-xs text-slate-400 font-normal">(ระบุหรือไม่ก็ได้)</span>
+          </label>
+          <input type="text" id="urlTopic" placeholder="เช่น ระบบลงทะเบียนอบรม, แบบประเมินความพึงพอใจ, รายงานผลประจำเดือน" 
+                 class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white/90 text-sm md:text-base" />
+        </div>
+
+        <!-- Action Buttons: Submit & Reset -->
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+          <!-- Submit Button -->
+          <button type="submit" id="submitBtn" 
+                  class="flex-1 py-3.5 px-6 bg-gradient-to-r from-teal-500 via-teal-600 to-indigo-600 hover:from-teal-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2 text-base md:text-lg">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>ย่อลิงก์ & สร้าง QR Code ทันที</span>
+          </button>
+
+          <!-- Reset Button -->
+          <button type="button" onclick="handleReset()" id="resetBtn" title="ล้างค่าที่กรอกทั้งหมด"
+                  class="py-3.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl border border-slate-300 hover:border-slate-400 transition flex items-center justify-center space-x-2 text-base shadow-sm">
+            <i class="fa-solid fa-rotate-left text-slate-500"></i>
+            <span>รีเซ็ต (Reset)</span>
+          </button>
+        </div>
+
+      </form>
+
+      <!-- Loading State -->
+      <div id="loadingBox" class="hidden my-8 text-center">
+        <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-teal-500 border-t-transparent"></div>
+        <p class="text-sm font-medium text-slate-600 mt-3 animate-pulse">กำลังย่อ URL, สร้าง QR Code และบันทึกลง Google Sheet...</p>
+      </div>
+
+      <!-- Result Card -->
+      <div id="resultBox" class="hidden mt-8 pt-8 border-t border-slate-200">
+        <div class="bg-gradient-to-br from-teal-50/70 to-indigo-50/70 rounded-2xl p-6 border border-teal-100 shadow-inner">
+          <div class="flex items-center space-x-2 text-emerald-600 font-bold text-lg mb-4">
+            <i class="fa-solid fa-circle-check text-xl"></i>
+            <span>สำเร็จ! ได้รับลิงก์ย่อและ QR Code เรียบร้อยแล้ว</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            
+            <!-- QR Code Section -->
+            <div class="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div class="relative group">
+                <img id="resQrImage" src="" alt="QR Code" class="w-44 h-44 object-contain rounded-xl border border-slate-200 p-1 bg-white shadow-sm" />
+              </div>
+              <button onclick="downloadQrCode()" 
+                      class="mt-3 w-full py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg flex items-center justify-center space-x-1.5 transition shadow-sm">
+                <i class="fa-solid fa-download"></i>
+                <span>ดาวน์โหลด QR Code (PNG)</span>
+              </button>
+            </div>
+
+            <!-- Details Section -->
+            <div class="md:col-span-2 space-y-4">
+              
+              <!-- Topic -->
+              <div>
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">หัวข้อ (Topic)</span>
+                <p id="resTopic" class="text-base font-bold text-slate-800 truncate"></p>
+              </div>
+
+              <!-- Short URL -->
+              <div>
+                <span class="text-xs font-semibold text-teal-700 uppercase tracking-wider">ลิงก์ย่อ (Short Url)</span>
+                <div class="flex items-center mt-1 space-x-2">
+                  <input type="text" id="resShortUrl" readonly 
+                         class="w-full px-3.5 py-2.5 bg-white font-mono text-sm font-bold text-teal-700 rounded-xl border border-teal-300 focus:outline-none select-all" />
+                  <button onclick="copyToClipboard('resShortUrl', this)" 
+                          class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-xl flex items-center space-x-1.5 transition whitespace-nowrap shadow-sm">
+                    <i class="fa-regular fa-copy"></i>
+                    <span>คัดลอก</span>
+                  </button>
+                  <a id="resOpenLink" href="#" target="_blank" 
+                     class="p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center transition shadow-sm" title="เปิดลิงก์">
+                    <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                  </a>
+                </div>
+              </div>
+
+              <!-- Original URL -->
+              <div>
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">ลิงก์ต้นฉบับ (Url)</span>
+                <p id="resLongUrl" class="text-xs text-slate-500 font-mono break-all mt-0.5 line-clamp-2 hover:line-clamp-none transition"></p>
+              </div>
+
+              <!-- Sheet saved banner -->
+              <div class="text-xs text-slate-700 flex items-center space-x-2 bg-white/90 p-3 rounded-xl border border-slate-200 shadow-sm">
+                <i class="fa-solid fa-database text-emerald-600 text-base"></i>
+                <div>
+                  <span class="font-semibold text-emerald-700">บันทึกลง Google Sheet แล้ว:</span>
+                  <span id="resTimestamp" class="ml-1 text-slate-600"></span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- History / Recent Links Section -->
+    <div class="mt-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-slate-700 flex items-center space-x-2 font-['Kanit']">
+          <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
+          <span>ประวัติการย่อลิงก์ล่าสุด (Recent Links)</span>
+        </h2>
+        <button onclick="loadRecentHistory()" class="text-xs text-teal-600 hover:text-teal-700 flex items-center space-x-1 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition shadow-sm">
+          <i class="fa-solid fa-rotate"></i>
+          <span>รีเฟรชประวัติ</span>
+        </button>
+      </div>
+
+      <div class="glass-card rounded-2xl shadow-md overflow-hidden border border-slate-200/80">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-600">
+            <thead class="bg-slate-100/80 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Timestamp</th>
+                <th class="py-3 px-4">Topic</th>
+                <th class="py-3 px-4">Short Url</th>
+                <th class="py-3 px-4 text-center">QR code</th>
+                <th class="py-3 px-4 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-slate-100">
+              <tr>
+                <td colspan="5" class="py-6 text-center text-slate-400 text-xs">
+                  <i class="fa-solid fa-spinner animate-spin mr-1"></i> กำลังโหลดประวัติ...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center text-xs text-slate-400 mt-12 py-4">
+    <p>ระบบย่อลิงก์และสร้าง QR Code | พัฒนาด้วย Google Apps Script, TailwindCSS & Google Sheets</p>
+  </footer>
+
+  <!-- QR Modal for preview from history -->
+  <div id="qrModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative">
+      <button onclick="closeQrModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 id="modalTitle" class="font-bold text-slate-800 text-base mb-3 truncate">QR Code</h3>
+      <img id="modalQrImg" src="" alt="QR Code" class="w-56 h-56 mx-auto rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
+      <p id="modalShortUrl" class="font-mono text-xs text-teal-600 font-semibold mt-3 break-all"></p>
+      <div class="mt-4 flex space-x-2">
+        <a id="modalDownloadBtn" href="#" target="_blank" download="qrcode.png"
+           class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1 shadow-sm">
+          <i class="fa-solid fa-download"></i>
+          <span>ดาวน์โหลด</span>
+        </a>
+        <button onclick="closeQrModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold">
+          ปิด
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentQrUrl = '';
+
+    // เมื่อโหลดหน้าเว็บเสร็จ
+    window.addEventListener('DOMContentLoaded', () => {
+      loadRecentHistory();
+    });
+
+    // วางข้อความจากคลิปบอร์ด
+    async function pasteClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          document.getElementById('longUrl').value = text;
+        }
+      } catch (err) {
+        alert('กรุณากดคลิกขวาแล้วกดวาง (Paste) หรือกด Ctrl+V');
+      }
+    }
+
+    // ฟังก์ชันปุ่มรีเซ็ต (Reset Button)
+    function handleReset() {
+      document.getElementById('longUrl').value = '';
+      document.getElementById('urlTopic').value = '';
+      document.getElementById('resultBox').classList.add('hidden');
+      document.getElementById('loadingBox').classList.add('hidden');
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+      currentQrUrl = '';
+      document.getElementById('longUrl').focus();
+    }
+
+    // จัดการเมื่อกดส่งฟอร์ม (Submit)
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const longUrl = document.getElementById('longUrl').value.trim();
+      const topic = document.getElementById('urlTopic').value.trim() || 'GAS Web App Link';
+
+      if (!longUrl) return;
+
+      // แสดงสถานะกำลังทำงาน
+      document.getElementById('loadingBox').classList.remove('hidden');
+      document.getElementById('resultBox').classList.add('hidden');
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      try {
+        // กรณีทำงานใน Google Apps Script Web App (google.script.run)
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler((response) => {
+              handleResponseSuccess(response);
+            })
+            .withFailureHandler((error) => {
+              handleResponseError(error);
+            })
+            .processShortenUrl(longUrl, topic);
+        } else {
+          // กรณีรันบนเบราว์เซอร์ปกติหรือ Local HTML (เรียก Multi-Shortener API และสร้างผลลัพธ์)
+          const shortUrl = await clientShortenUrl(longUrl);
+          const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shortUrl)}`;
+          
+          handleResponseSuccess({
+            status: 'success',
+            data: {
+              timestamp: new Date().toLocaleString('th-TH'),
+              topic: topic,
+              longUrl: longUrl,
+              shortUrl: shortUrl,
+              qrCodeUrl: qrCodeUrl
+            }
+          });
+        }
+      } catch (err) {
+        handleResponseError(err);
+      }
+    }
+
+    // ย่อลิงก์ฝั่ง Client (Multi-provider Fallback)
+    async function clientShortenUrl(url) {
+      // 1. ลองผ่าน Ulvis API (เปิดรับ CORS)
+      try {
+        const res = await fetch(`https://ulvis.net/API/write/get?url=${encodeURIComponent(url)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.success && json.data && json.data.url) {
+            return json.data.url;
+          }
+        }
+      } catch (e) {
+        console.warn('Ulvis failed, trying next...');
+      }
+
+      // 2. ลองผ่าน TinyURL API
+      try {
+        const res2 = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+        if (res2.ok) {
+          const text = await res2.text();
+          if (text && text.startsWith('http')) return text.trim();
+        }
+      } catch (e2) {
+        console.warn('TinyURL failed, trying next...');
+      }
+
+      // 3. ลองผ่าน Clck.ru API
+      try {
+        const res3 = await fetch(`https://clck.ru/--?url=${encodeURIComponent(url)}`);
+        if (res3.ok) {
+          const text3 = await res3.text();
+          if (text3 && text3.startsWith('http')) return text3.trim();
+        }
+      } catch (e3) {
+        console.warn('Clck.ru failed');
+      }
+
+      return url;
+    }
+
+    // จัดการผลลัพธ์สำเร็จ
+    function handleResponseSuccess(response) {
+      document.getElementById('loadingBox').classList.add('hidden');
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+      if (response && response.status === 'success' && response.data) {
+        const data = response.data;
+        currentQrUrl = data.qrCodeUrl;
+
+        document.getElementById('resTopic').textContent = data.topic || data.title || 'ไม่มีหัวข้อ';
+        document.getElementById('resShortUrl').value = data.shortUrl;
+        document.getElementById('resLongUrl').textContent = data.longUrl;
+        document.getElementById('resQrImage').src = data.qrCodeUrl;
+        document.getElementById('resOpenLink').href = data.shortUrl;
+        document.getElementById('resTimestamp').textContent = data.timestamp || 'ปัจจุบัน';
+
+        document.getElementById('resultBox').classList.remove('hidden');
+        document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth' });
+
+        // เพิ่มเข้าตารางประวัติ
+        addHistoryRow(data);
+      } else {
+        alert('เกิดข้อผิดพลาด: ' + (response ? response.message : 'ไม่สามารถสร้างลิงก์ได้'));
+      }
+    }
+
+    function handleResponseError(error) {
+      document.getElementById('loadingBox').classList.add('hidden');
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      alert('เกิดข้อผิดพลาด: ' + (error.message || error));
+    }
+
+    // คัดลอกข้อความ
+    function copyToClipboard(elementId, btn) {
+      const input = document.getElementById(elementId);
+      input.select();
+      input.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(input.value);
+
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>คัดลอกแล้ว!</span>';
+      btn.classList.remove('bg-teal-600', 'hover:bg-teal-700');
+      btn.classList.add('bg-emerald-600');
+
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.classList.add('bg-teal-600', 'hover:bg-teal-700');
+        btn.classList.remove('bg-emerald-600');
+      }, 2000);
+    }
+
+    // คัดลอกข้อความจากค่าที่ระบุ
+    function copyDirect(text, btn) {
+      navigator.clipboard.writeText(text);
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check text-emerald-500"></i>';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+      }, 1500);
+    }
+
+    // ดาวน์โหลดรูป QR Code
+    async function downloadQrCode(url = currentQrUrl) {
+      if (!url) return;
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `qrcode_${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      } catch (e) {
+        window.open(url, '_blank');
+      }
+    }
+
+    // โหลดประวัติจาก Google Sheet
+    function loadRecentHistory() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler((links) => {
+            renderHistory(links);
+          })
+          .getRecentLinks(15);
+      } else {
+        renderHistory([]);
+      }
+    }
+
+    function renderHistory(links) {
+      const tbody = document.getElementById('historyTableBody');
+      if (!links || links.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-6 text-center text-slate-400 text-xs">
+              ยังไม่มีประวัติการย่อลิงก์
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = links.map(item => `
+        <tr class="hover:bg-slate-50/70 transition">
+          <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">${item.timestamp || '-'}</td>
+          <td class="py-3 px-4 font-medium text-slate-800 text-xs max-w-[150px] truncate" title="${item.topic || item.title}">${item.topic || item.title}</td>
+          <td class="py-3 px-4 font-mono text-xs text-teal-600 font-semibold">
+            <a href="${item.shortUrl}" target="_blank" class="hover:underline">${item.shortUrl}</a>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="openQrModal('${item.topic || item.title}', '${item.shortUrl}', '${item.qrCodeUrl}')" 
+                    class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-teal-600 transition" title="ดู QR Code">
+              <i class="fa-solid fa-qrcode text-base"></i>
+            </button>
+          </td>
+          <td class="py-3 px-4 text-center whitespace-nowrap">
+            <button onclick="copyDirect('${item.shortUrl}', this)" class="p-1.5 text-slate-500 hover:text-teal-600 transition mr-1" title="คัดลอกลิงก์">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+            <a href="${item.shortUrl}" target="_blank" class="p-1.5 text-slate-500 hover:text-indigo-600 transition" title="เปิดลิงก์">
+              <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+            </a>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function addHistoryRow(data) {
+      const tbody = document.getElementById('historyTableBody');
+      const emptyRow = tbody.querySelector('td[colspan="5"]');
+      if (emptyRow) tbody.innerHTML = '';
+
+      const topicText = data.topic || data.title || 'ไม่มีหัวข้อ';
+      const newRowHtml = `
+        <tr class="bg-teal-50/40 hover:bg-slate-50 transition">
+          <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">${data.timestamp || 'เมื่อสักครู่'}</td>
+          <td class="py-3 px-4 font-medium text-slate-800 text-xs max-w-[150px] truncate" title="${topicText}">${topicText}</td>
+          <td class="py-3 px-4 font-mono text-xs text-teal-600 font-semibold">
+            <a href="${data.shortUrl}" target="_blank" class="hover:underline">${data.shortUrl}</a>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="openQrModal('${topicText}', '${data.shortUrl}', '${data.qrCodeUrl}')" 
+                    class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-teal-600 transition" title="ดู QR Code">
+              <i class="fa-solid fa-qrcode text-base"></i>
+            </button>
+          </td>
+          <td class="py-3 px-4 text-center whitespace-nowrap">
+            <button onclick="copyDirect('${data.shortUrl}', this)" class="p-1.5 text-slate-500 hover:text-teal-600 transition mr-1" title="คัดลอกลิงก์">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+            <a href="${data.shortUrl}" target="_blank" class="p-1.5 text-slate-500 hover:text-indigo-600 transition" title="เปิดลิงก์">
+              <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+            </a>
+          </td>
+        </tr>
+      `;
+      tbody.insertAdjacentHTML('afterbegin', newRowHtml);
+    }
+
+    // Modal QR Code
+    function openQrModal(topic, shortUrl, qrUrl) {
+      document.getElementById('modalTitle').textContent = topic;
+      document.getElementById('modalShortUrl').textContent = shortUrl;
+      document.getElementById('modalQrImg').src = qrUrl;
+      document.getElementById('modalDownloadBtn').onclick = (e) => {
+        e.preventDefault();
+        downloadQrCode(qrUrl);
+      };
+      document.getElementById('qrModal').classList.remove('hidden');
+    }
+
+    function closeQrModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
