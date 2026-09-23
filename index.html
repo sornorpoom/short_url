@@ -40,9 +40,9 @@
       min-height: 100vh;
     }
     .glass-card {
-      background: rgba(255, 255, 255, 0.95);
+      background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(226, 232, 240, 0.8);
+      border: 1px solid rgba(226, 232, 240, 0.85);
     }
   </style>
 </head>
@@ -50,7 +50,7 @@
 
   <div class="max-w-4xl mx-auto w-full">
     <!-- Header -->
-    <header class="text-center mb-8">
+    <header class="text-center mb-6">
       <div class="inline-flex items-center justify-center p-3.5 bg-gradient-to-tr from-teal-500 via-teal-600 to-indigo-600 rounded-2xl text-white shadow-lg mb-4">
         <i class="fa-solid fa-link text-2xl mr-2"></i>
         <i class="fa-solid fa-qrcode text-2xl"></i>
@@ -62,21 +62,27 @@
         แปลง URL ยาวของ Google Apps Script หรือเว็บทั่วไปให้สั้นลง พร้อมสร้าง QR Code และบันทึกลง Google Sheet ทันที
       </p>
       
-      <!-- Link to Google Sheet -->
+      <!-- Link to Google Sheet & API Config -->
       <div class="mt-3 flex flex-wrap justify-center items-center gap-2">
         <a href="https://docs.google.com/spreadsheets/d/19lTnU0PZMlUEAleqfiHEvNks2HBqbbrfFMj5Mwv0R98/edit?usp=sharing" target="_blank" 
            class="inline-flex items-center text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3.5 py-1.5 rounded-full shadow-sm transition">
-          <i class="fa-solid fa-table text-emerald-600 mr-1.5"></i> ตรวจสอบข้อมูลใน Google Spreadsheet
+          <i class="fa-solid fa-table text-emerald-600 mr-1.5"></i> ดู Google Sheet (19lTnU...0R98)
           <i class="fa-solid fa-arrow-up-right-from-square ml-1.5 text-[10px]"></i>
         </a>
+
+        <!-- Toggle GAS API Config Modal (สำหรับ Vercel / GitHub Pages) -->
+        <button onclick="toggleApiModal()" id="apiConfigBtn" class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-indigo-600 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full shadow-sm transition">
+          <i class="fa-solid fa-gear text-slate-400 mr-1.5" id="apiStatusDot"></i> 
+          <span id="apiStatusText">เชื่อมต่อ GAS API (สำหรับ Vercel)</span>
+        </button>
       </div>
     </header>
 
     <!-- Main Card -->
     <div class="glass-card rounded-3xl p-6 md:p-8 shadow-xl border border-slate-100">
       
-      <!-- Input Form -->
-      <form id="shortenerForm" onsubmit="handleSubmit(event)" class="space-y-4">
+      <!-- Input Form Container (No form reload to prevent white screen in GAS) -->
+      <div id="shortenerForm" class="space-y-4">
         
         <!-- Long URL Input -->
         <div>
@@ -84,7 +90,8 @@
             <i class="fa-solid fa-link text-teal-600 mr-1.5"></i> ลิงก์ที่ต้องการย่อ (Url / Google Apps Script Web App URL) <span class="text-rose-500">*</span>
           </label>
           <div class="relative">
-            <input type="url" id="longUrl" required placeholder="https://script.google.com/macros/s/.../exec หรือ https://example.com" 
+            <input type="url" id="longUrl" placeholder="https://script.google.com/macros/s/.../exec หรือ https://example.com" 
+                   onkeydown="if(event.key==='Enter'){event.preventDefault(); handleSubmit();}"
                    class="w-full pl-4 pr-12 py-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white/90 text-sm md:text-base" />
             <button type="button" onclick="pasteClipboard()" title="วางจากคลิปบอร์ด"
                     class="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-teal-600 transition">
@@ -99,27 +106,28 @@
             <i class="fa-solid fa-tag text-indigo-600 mr-1.5"></i> หัวข้อ / เรื่อง (Topic) <span class="text-xs text-slate-400 font-normal">(ระบุหรือไม่ก็ได้)</span>
           </label>
           <input type="text" id="urlTopic" placeholder="เช่น ระบบลงทะเบียนอบรม, แบบประเมินความพึงพอใจ, รายงานผลประจำเดือน" 
+                 onkeydown="if(event.key==='Enter'){event.preventDefault(); handleSubmit();}"
                  class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white/90 text-sm md:text-base" />
         </div>
 
         <!-- Action Buttons: Submit & Reset -->
         <div class="flex flex-col sm:flex-row gap-3 pt-2">
           <!-- Submit Button -->
-          <button type="submit" id="submitBtn" 
-                  class="flex-1 py-3.5 px-6 bg-gradient-to-r from-teal-500 via-teal-600 to-indigo-600 hover:from-teal-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2 text-base md:text-lg">
+          <button type="button" onclick="handleSubmit()" id="submitBtn" 
+                  class="flex-1 py-3.5 px-6 bg-gradient-to-r from-teal-500 via-teal-600 to-indigo-600 hover:from-teal-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2 text-base md:text-lg cursor-pointer">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
             <span>ย่อลิงก์ & สร้าง QR Code ทันที</span>
           </button>
 
           <!-- Reset Button -->
           <button type="button" onclick="handleReset()" id="resetBtn" title="ล้างค่าที่กรอกทั้งหมด"
-                  class="py-3.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl border border-slate-300 hover:border-slate-400 transition flex items-center justify-center space-x-2 text-base shadow-sm">
+                  class="py-3.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl border border-slate-300 hover:border-slate-400 transition flex items-center justify-center space-x-2 text-base shadow-sm cursor-pointer">
             <i class="fa-solid fa-rotate-left text-slate-500"></i>
             <span>รีเซ็ต (Reset)</span>
           </button>
         </div>
 
-      </form>
+      </div>
 
       <!-- Loading State -->
       <div id="loadingBox" class="hidden my-8 text-center">
@@ -143,7 +151,7 @@
                 <img id="resQrImage" src="" alt="QR Code" class="w-44 h-44 object-contain rounded-xl border border-slate-200 p-1 bg-white shadow-sm" />
               </div>
               <button onclick="downloadQrCode()" 
-                      class="mt-3 w-full py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg flex items-center justify-center space-x-1.5 transition shadow-sm">
+                      class="mt-3 w-full py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg flex items-center justify-center space-x-1.5 transition shadow-sm cursor-pointer">
                 <i class="fa-solid fa-download"></i>
                 <span>ดาวน์โหลด QR Code (PNG)</span>
               </button>
@@ -165,7 +173,7 @@
                   <input type="text" id="resShortUrl" readonly 
                          class="w-full px-3.5 py-2.5 bg-white font-mono text-sm font-bold text-teal-700 rounded-xl border border-teal-300 focus:outline-none select-all" />
                   <button onclick="copyToClipboard('resShortUrl', this)" 
-                          class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-xl flex items-center space-x-1.5 transition whitespace-nowrap shadow-sm">
+                          class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-xl flex items-center space-x-1.5 transition whitespace-nowrap shadow-sm cursor-pointer">
                     <i class="fa-regular fa-copy"></i>
                     <span>คัดลอก</span>
                   </button>
@@ -186,7 +194,7 @@
               <div class="text-xs text-slate-700 flex items-center space-x-2 bg-white/90 p-3 rounded-xl border border-slate-200 shadow-sm">
                 <i class="fa-solid fa-database text-emerald-600 text-base"></i>
                 <div>
-                  <span class="font-semibold text-emerald-700">บันทึกลง Google Sheet แล้ว:</span>
+                  <span class="font-semibold text-emerald-700" id="resSheetStatus">บันทึกลง Google Sheet แล้ว:</span>
                   <span id="resTimestamp" class="ml-1 text-slate-600"></span>
                 </div>
               </div>
@@ -217,7 +225,7 @@
           </div>
 
           <!-- Refresh Button -->
-          <button onclick="loadRecentHistory(true)" class="text-xs text-teal-700 hover:text-teal-800 flex items-center space-x-1.5 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 transition shadow-sm" title="ดึงข้อมูลล่าสุดจาก Google Sheet">
+          <button onclick="loadRecentHistory(true)" class="text-xs text-teal-700 hover:text-teal-800 flex items-center space-x-1.5 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 transition shadow-sm cursor-pointer" title="ดึงข้อมูลล่าสุดจาก Google Sheet">
             <i class="fa-solid fa-rotate text-teal-600" id="refreshIcon"></i>
             <span>รีเฟรช</span>
           </button>
@@ -244,6 +252,47 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- API Config Modal (สำหรับเชื่อมต่อ Google Apps Script Web App เมื่อรันบน Vercel / GitHub Pages) -->
+  <div id="apiModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl relative">
+      <button onclick="toggleApiModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div class="flex items-center space-x-2 text-indigo-600 mb-2">
+        <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+        <h3 class="font-bold text-slate-800 text-lg font-['Kanit']">ตั้งค่าเชื่อมต่อ Google Apps Script Web App</h3>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">
+        เมื่อโฮสต์เว็บนี้บน **Vercel** หรือ **GitHub Pages** กรุณานำ URL ที่ได้จากการ Deploy Web App ของ Google Apps Script มาใส่ เพื่อให้ข้อมูลบันทึกเข้า Google Sheet อัตโนมัติ:
+      </p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">
+            Google Apps Script Web App URL (ลงท้ายด้วย /exec)
+          </label>
+          <input type="url" id="gasApiInput" placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                 class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1">
+          <p class="font-semibold text-slate-700">📌 วิธีรับ Web App URL จาก Google Apps Script:</p>
+          <p>1. ใน Apps Script กด **Deploy (การทำให้ใช้งานได้)** > **Manage deployments**</p>
+          <p>2. คัดลอก **Web app URL** มาวางในช่องนี้</p>
+        </div>
+
+        <div class="flex space-x-2 pt-2">
+          <button onclick="saveGasApiUrl()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition">
+            บันทึกการเชื่อมต่อ
+          </button>
+          <button onclick="toggleApiModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold">
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Footer -->
@@ -277,12 +326,15 @@
     let currentQrUrl = '';
     let allLinksHistory = []; // เก็บประวัติทั้งหมดเพื่อการค้นหาและการจัดเรียง
     const STORAGE_KEY = 'gas_url_shortener_recent_links_v1';
+    const GAS_API_KEY = 'gas_url_shortener_api_endpoint_v1';
 
     // เมื่อโหลดหน้าเว็บเสร็จ
     window.addEventListener('DOMContentLoaded', () => {
       // 1. โหลดประวัติจาก localStorage ทันที เพื่อให้อยู่ตลอดไม่ต้องรอโหลด
       loadFromLocalStorage();
-      // 2. ดึงประวัติล่าสุดที่อัปเดตจาก Google Sheet มา Sync ร่วมกัน
+      // 2. เช็คสถานะการเชื่อมต่อ GAS API
+      updateApiStatusBadge();
+      // 3. ดึงประวัติล่าสุดที่อัปเดตจาก Google Sheet มา Sync ร่วมกัน
       loadRecentHistory(false);
     });
 
@@ -306,6 +358,45 @@
       } catch (e) {
         console.warn('Save localStorage failed', e);
       }
+    }
+
+    // ตรวจสอบและอัปเดตปุ่มสถานะ API
+    function updateApiStatusBadge() {
+      const isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
+      const apiEndpoint = localStorage.getItem(GAS_API_KEY) || '';
+      const dot = document.getElementById('apiStatusDot');
+      const text = document.getElementById('apiStatusText');
+      const input = document.getElementById('gasApiInput');
+      if (input) input.value = apiEndpoint;
+
+      if (isGAS) {
+        if (dot) { dot.className = 'fa-solid fa-circle-check text-emerald-500 mr-1.5'; }
+        if (text) { text.textContent = 'ทำงานใน GAS (เชื่อมต่อ Sheet อัตโนมัติ)'; }
+      } else if (apiEndpoint) {
+        if (dot) { dot.className = 'fa-solid fa-circle-check text-indigo-500 mr-1.5'; }
+        if (text) { text.textContent = 'เชื่อมต่อ GAS API แล้ว'; }
+      } else {
+        if (dot) { dot.className = 'fa-solid fa-circle-exclamation text-amber-500 mr-1.5'; }
+        if (text) { text.textContent = 'ตั้งค่า GAS API (เพื่อให้ลง Sheet)'; }
+      }
+    }
+
+    function toggleApiModal() {
+      const modal = document.getElementById('apiModal');
+      modal.classList.toggle('hidden');
+    }
+
+    function saveGasApiUrl() {
+      const val = document.getElementById('gasApiInput').value.trim();
+      if (val) {
+        localStorage.setItem(GAS_API_KEY, val);
+      } else {
+        localStorage.removeItem(GAS_API_KEY);
+      }
+      updateApiStatusBadge();
+      toggleApiModal();
+      loadRecentHistory(true);
+      alert('บันทึกการตั้งค่า Web App API เรียบร้อยแล้ว!');
     }
 
     // วางข้อความจากคลิปบอร์ด
@@ -335,13 +426,17 @@
       document.getElementById('longUrl').focus();
     }
 
-    // จัดการเมื่อกดส่งฟอร์ม (Submit)
-    async function handleSubmit(e) {
-      e.preventDefault();
-      const longUrl = document.getElementById('longUrl').value.trim();
+    // จัดการเมื่อกดปุ่มย่อลิงก์ (Submit)
+    async function handleSubmit() {
+      const longUrlInput = document.getElementById('longUrl');
+      const longUrl = longUrlInput.value.trim();
       const topic = document.getElementById('urlTopic').value.trim() || 'GAS Web App Link';
 
-      if (!longUrl) return;
+      if (!longUrl) {
+        alert('กรุณากรอก URL ที่ต้องการย่อ');
+        longUrlInput.focus();
+        return;
+      }
 
       // แสดงสถานะกำลังทำงาน
       document.getElementById('loadingBox').classList.remove('hidden');
@@ -351,7 +446,7 @@
       submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
       try {
-        // กรณีทำงานใน Google Apps Script Web App (google.script.run)
+        // กรณีที่ 1: รันอยู่ภายใน Google Apps Script Web App
         if (typeof google !== 'undefined' && google.script && google.script.run) {
           google.script.run
             .withSuccessHandler((response) => {
@@ -361,22 +456,43 @@
               handleResponseError(error);
             })
             .processShortenUrl(longUrl, topic);
-        } else {
-          // กรณีรันบนเบราว์เซอร์ปกติหรือ Local HTML (เรียก Multi-Shortener API และสร้างผลลัพธ์)
-          const shortUrl = await clientShortenUrl(longUrl);
-          const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shortUrl)}`;
-          
-          handleResponseSuccess({
-            status: 'success',
-            data: {
-              timestamp: new Date().toLocaleString('th-TH', { hour12: false }),
-              topic: topic,
-              longUrl: longUrl,
-              shortUrl: shortUrl,
-              qrCodeUrl: qrCodeUrl
-            }
-          });
+          return;
         }
+
+        // กรณีที่ 2: รันบน Vercel / GitHub Pages แต่มีการระบุ Google Apps Script Web App URL
+        const gasApiUrl = localStorage.getItem(GAS_API_KEY);
+        if (gasApiUrl && gasApiUrl.startsWith('http')) {
+          try {
+            const endpoint = `${gasApiUrl}${gasApiUrl.includes('?') ? '&' : '?'}action=shorten&url=${encodeURIComponent(longUrl)}&topic=${encodeURIComponent(topic)}`;
+            const fetchRes = await fetch(endpoint, { method: 'GET' });
+            if (fetchRes.ok) {
+              const gasData = await fetchRes.json();
+              if (gasData && gasData.status === 'success') {
+                handleResponseSuccess(gasData);
+                return;
+              }
+            }
+          } catch (apiErr) {
+            console.warn('Call GAS API via GET failed, falling back to client-side...', apiErr);
+          }
+        }
+
+        // กรณีที่ 3: ย่อผ่าน Client Multi-Shortener
+        const shortUrl = await clientShortenUrl(longUrl);
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shortUrl)}`;
+        
+        handleResponseSuccess({
+          status: 'success',
+          data: {
+            timestamp: new Date().toLocaleString('th-TH', { hour12: false }),
+            topic: topic,
+            longUrl: longUrl,
+            shortUrl: shortUrl,
+            qrCodeUrl: qrCodeUrl,
+            isClientOnly: !gasApiUrl
+          }
+        });
+
       } catch (err) {
         handleResponseError(err);
       }
@@ -439,6 +555,16 @@
         document.getElementById('resQrImage').src = data.qrCodeUrl;
         document.getElementById('resOpenLink').href = data.shortUrl;
         document.getElementById('resTimestamp').textContent = data.timestamp || 'ปัจจุบัน';
+
+        // ป้ายสถานะ Google Sheet
+        const sheetStatus = document.getElementById('resSheetStatus');
+        if (data.isClientOnly) {
+          sheetStatus.textContent = 'บันทึกในเบราว์เซอร์แล้ว (ตั้งค่า GAS API ด้านบนเพื่อส่งเข้า Google Sheet):';
+          sheetStatus.className = 'font-semibold text-amber-700';
+        } else {
+          sheetStatus.textContent = 'บันทึกลง Google Sheet แล้ว:';
+          sheetStatus.className = 'font-semibold text-emerald-700';
+        }
 
         document.getElementById('resultBox').classList.remove('hidden');
         document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth' });
@@ -506,17 +632,18 @@
       }
     }
 
-    // โหลดประวัติจาก Google Sheet
-    function loadRecentHistory(showSpin = false) {
+    // โหลดประวัติจาก Google Sheet หรือ Web App API
+    async function loadRecentHistory(showSpin = false) {
       const icon = document.getElementById('refreshIcon');
       if (showSpin && icon) icon.classList.add('animate-spin');
 
+      // 1. ถ้าอยู่ใน GAS
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler((links) => {
             if (showSpin && icon) icon.classList.remove('animate-spin');
             if (Array.isArray(links) && links.length > 0) {
-              allLinksHistory = links; // ลิงก์ที่ส่งมาจาก Apps Script เรียงล่าสุดอยู่บนสุดแล้ว
+              allLinksHistory = links;
               saveToLocalStorage(allLinksHistory);
               renderHistory(allLinksHistory);
             }
@@ -526,10 +653,30 @@
             console.error('Fetch links error', err);
           })
           .getRecentLinks(100);
-      } else {
-        if (showSpin && icon) {
-          setTimeout(() => icon.classList.remove('animate-spin'), 600);
+        return;
+      }
+
+      // 2. ถ้าอยู่บน Vercel / GitHub และมีการตั้งค่า GAS API
+      const gasApiUrl = localStorage.getItem(GAS_API_KEY);
+      if (gasApiUrl && gasApiUrl.startsWith('http')) {
+        try {
+          const endpoint = `${gasApiUrl}${gasApiUrl.includes('?') ? '&' : '?'}action=getLinks&limit=100`;
+          const fetchRes = await fetch(endpoint);
+          if (fetchRes.ok) {
+            const resJson = await fetchRes.json();
+            if (resJson && resJson.status === 'success' && Array.isArray(resJson.data)) {
+              allLinksHistory = resJson.data;
+              saveToLocalStorage(allLinksHistory);
+              renderHistory(allLinksHistory);
+            }
+          }
+        } catch (e) {
+          console.warn('Sync history from GAS API failed', e);
         }
+      }
+
+      if (showSpin && icon) {
+        setTimeout(() => icon.classList.remove('animate-spin'), 600);
       }
     }
 
@@ -599,12 +746,12 @@
           </td>
           <td class="py-3 px-4 text-center">
             <button onclick="openQrModal('${item.topic}', '${item.shortUrl}', '${item.qrCodeUrl}')" 
-                    class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-teal-600 transition" title="ดู QR Code">
+                    class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-teal-600 transition cursor-pointer" title="ดู QR Code">
               <i class="fa-solid fa-qrcode text-base"></i>
             </button>
           </td>
           <td class="py-3 px-4 text-center whitespace-nowrap">
-            <button onclick="copyDirect('${item.shortUrl}', this)" class="p-1.5 text-slate-500 hover:text-teal-600 transition mr-1" title="คัดลอกลิงก์">
+            <button onclick="copyDirect('${item.shortUrl}', this)" class="p-1.5 text-slate-500 hover:text-teal-600 transition mr-1 cursor-pointer" title="คัดลอกลิงก์">
               <i class="fa-regular fa-copy"></i>
             </button>
             <a href="${item.shortUrl}" target="_blank" class="p-1.5 text-slate-500 hover:text-indigo-600 transition" title="เปิดลิงก์">
