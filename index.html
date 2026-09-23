@@ -40,7 +40,7 @@
       min-height: 100vh;
     }
     .glass-card {
-      background: rgba(255, 255, 255, 0.94);
+      background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(226, 232, 240, 0.8);
     }
@@ -199,23 +199,35 @@
 
     </div>
 
-    <!-- History / Recent Links Section -->
+    <!-- History / Recent Links Section (Persisted & Sorted Newest First) -->
     <div class="mt-8">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <h2 class="text-lg font-bold text-slate-700 flex items-center space-x-2 font-['Kanit']">
           <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
           <span>ประวัติการย่อลิงก์ล่าสุด (Recent Links)</span>
+          <span id="historyCountBadge" class="ml-2 text-xs bg-teal-100 text-teal-800 font-semibold px-2.5 py-0.5 rounded-full">0 รายการ</span>
         </h2>
-        <button onclick="loadRecentHistory()" class="text-xs text-teal-600 hover:text-teal-700 flex items-center space-x-1 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition shadow-sm">
-          <i class="fa-solid fa-rotate"></i>
-          <span>รีเฟรชประวัติ</span>
-        </button>
+        
+        <div class="flex items-center space-x-2">
+          <!-- Search Input -->
+          <div class="relative">
+            <input type="text" id="searchInput" oninput="filterHistory()" placeholder="ค้นหาตามชื่อ หรือ URL..." 
+                   class="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 w-48 transition" />
+            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          </div>
+
+          <!-- Refresh Button -->
+          <button onclick="loadRecentHistory(true)" class="text-xs text-teal-700 hover:text-teal-800 flex items-center space-x-1.5 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 transition shadow-sm" title="ดึงข้อมูลล่าสุดจาก Google Sheet">
+            <i class="fa-solid fa-rotate text-teal-600" id="refreshIcon"></i>
+            <span>รีเฟรช</span>
+          </button>
+        </div>
       </div>
 
       <div class="glass-card rounded-2xl shadow-md overflow-hidden border border-slate-200/80">
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-100/80 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
+            <thead class="bg-slate-100/90 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
               <tr>
                 <th class="py-3 px-4">Timestamp</th>
                 <th class="py-3 px-4">Topic</th>
@@ -225,11 +237,7 @@
               </tr>
             </thead>
             <tbody id="historyTableBody" class="divide-y divide-slate-100">
-              <tr>
-                <td colspan="5" class="py-6 text-center text-slate-400 text-xs">
-                  <i class="fa-solid fa-spinner animate-spin mr-1"></i> กำลังโหลดประวัติ...
-                </td>
-              </tr>
+              <!-- Rendered by JS -->
             </tbody>
           </table>
         </div>
@@ -240,7 +248,7 @@
 
   <!-- Footer -->
   <footer class="text-center text-xs text-slate-400 mt-12 py-4">
-    <p>ระบบย่อลิงก์และสร้าง QR Code | พัฒนาด้วย Google Apps Script, TailwindCSS & Google Sheets</p>
+    <p>ระบบย่อลิงก์และสร้าง QR Code | บันทึกประวัติถาวรลง Google Sheet และเบราว์เซอร์</p>
   </footer>
 
   <!-- QR Modal for preview from history -->
@@ -267,11 +275,38 @@
 
   <script>
     let currentQrUrl = '';
+    let allLinksHistory = []; // เก็บประวัติทั้งหมดเพื่อการค้นหาและการจัดเรียง
+    const STORAGE_KEY = 'gas_url_shortener_recent_links_v1';
 
     // เมื่อโหลดหน้าเว็บเสร็จ
     window.addEventListener('DOMContentLoaded', () => {
-      loadRecentHistory();
+      // 1. โหลดประวัติจาก localStorage ทันที เพื่อให้อยู่ตลอดไม่ต้องรอโหลด
+      loadFromLocalStorage();
+      // 2. ดึงประวัติล่าสุดที่อัปเดตจาก Google Sheet มา Sync ร่วมกัน
+      loadRecentHistory(false);
     });
+
+    // โหลดประวัติที่แคชไว้ในเครื่อง
+    function loadFromLocalStorage() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          allLinksHistory = JSON.parse(saved);
+          renderHistory(allLinksHistory);
+        }
+      } catch (e) {
+        console.warn('Load localStorage failed', e);
+      }
+    }
+
+    // บันทึกประวัติลง localStorage
+    function saveToLocalStorage(links) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+      } catch (e) {
+        console.warn('Save localStorage failed', e);
+      }
+    }
 
     // วางข้อความจากคลิปบอร์ด
     async function pasteClipboard() {
@@ -334,7 +369,7 @@
           handleResponseSuccess({
             status: 'success',
             data: {
-              timestamp: new Date().toLocaleString('th-TH'),
+              timestamp: new Date().toLocaleString('th-TH', { hour12: false }),
               topic: topic,
               longUrl: longUrl,
               shortUrl: shortUrl,
@@ -408,8 +443,8 @@
         document.getElementById('resultBox').classList.remove('hidden');
         document.getElementById('resultBox').scrollIntoView({ behavior: 'smooth' });
 
-        // เพิ่มเข้าตารางประวัติ
-        addHistoryRow(data);
+        // เพิ่มเข้าประวัติที่อันดับ 1 (บนสุดเสมอ) และเซฟ
+        addHistoryItem(data);
       } else {
         alert('เกิดข้อผิดพลาด: ' + (response ? response.message : 'ไม่สามารถสร้างลิงก์ได้'));
       }
@@ -472,40 +507,98 @@
     }
 
     // โหลดประวัติจาก Google Sheet
-    function loadRecentHistory() {
+    function loadRecentHistory(showSpin = false) {
+      const icon = document.getElementById('refreshIcon');
+      if (showSpin && icon) icon.classList.add('animate-spin');
+
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler((links) => {
-            renderHistory(links);
+            if (showSpin && icon) icon.classList.remove('animate-spin');
+            if (Array.isArray(links) && links.length > 0) {
+              allLinksHistory = links; // ลิงก์ที่ส่งมาจาก Apps Script เรียงล่าสุดอยู่บนสุดแล้ว
+              saveToLocalStorage(allLinksHistory);
+              renderHistory(allLinksHistory);
+            }
           })
-          .getRecentLinks(15);
+          .withFailureHandler((err) => {
+            if (showSpin && icon) icon.classList.remove('animate-spin');
+            console.error('Fetch links error', err);
+          })
+          .getRecentLinks(100);
       } else {
-        renderHistory([]);
+        if (showSpin && icon) {
+          setTimeout(() => icon.classList.remove('animate-spin'), 600);
+        }
       }
     }
 
+    // เพิ่มรายการใหม่เข้าลิสต์ที่ลำดับแรกสุดเสมอ (Newest First)
+    function addHistoryItem(data) {
+      const newItem = {
+        timestamp: data.timestamp || new Date().toLocaleString('th-TH', { hour12: false }),
+        topic: data.topic || data.title || 'ไม่มีหัวข้อ',
+        longUrl: data.longUrl || '',
+        shortUrl: data.shortUrl || '',
+        qrCodeUrl: data.qrCodeUrl || ''
+      };
+
+      // ใส่รายการใหม่ที่ตำแหน่งแรก (index 0)
+      allLinksHistory.unshift(newItem);
+      saveToLocalStorage(allLinksHistory);
+      renderHistory(allLinksHistory);
+    }
+
+    // ค้นหาในประวัติ
+    function filterHistory() {
+      const query = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+      if (!query) {
+        renderHistory(allLinksHistory);
+        return;
+      }
+      const filtered = allLinksHistory.filter(item => 
+        (item.topic && item.topic.toLowerCase().includes(query)) ||
+        (item.shortUrl && item.shortUrl.toLowerCase().includes(query)) ||
+        (item.longUrl && item.longUrl.toLowerCase().includes(query)) ||
+        (item.timestamp && item.timestamp.toLowerCase().includes(query))
+      );
+      renderHistory(filtered);
+    }
+
+    // แสดงผลตารางประวัติ
     function renderHistory(links) {
       const tbody = document.getElementById('historyTableBody');
+      const badge = document.getElementById('historyCountBadge');
+      
+      if (badge) {
+        badge.textContent = `${links ? links.length : 0} รายการ`;
+      }
+
       if (!links || links.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="py-6 text-center text-slate-400 text-xs">
-              ยังไม่มีประวัติการย่อลิงก์
+            <td colspan="5" class="py-8 text-center text-slate-400 text-xs">
+              <i class="fa-regular fa-folder-open text-2xl mb-2 text-slate-300 block"></i>
+              ยังไม่มีประวัติการย่อลิงก์ (สร้างลิงก์ใหม่เพื่อบันทึกประวัติ)
             </td>
           </tr>
         `;
         return;
       }
 
-      tbody.innerHTML = links.map(item => `
-        <tr class="hover:bg-slate-50/70 transition">
-          <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">${item.timestamp || '-'}</td>
-          <td class="py-3 px-4 font-medium text-slate-800 text-xs max-w-[150px] truncate" title="${item.topic || item.title}">${item.topic || item.title}</td>
+      tbody.innerHTML = links.map((item, idx) => `
+        <tr class="hover:bg-slate-50/80 transition ${idx === 0 ? 'bg-teal-50/20' : ''}">
+          <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">
+            <span class="font-medium text-slate-700">${item.timestamp || '-'}</span>
+          </td>
+          <td class="py-3 px-4 font-medium text-slate-800 text-xs max-w-[180px] truncate" title="${item.topic}">
+            ${item.topic}
+          </td>
           <td class="py-3 px-4 font-mono text-xs text-teal-600 font-semibold">
             <a href="${item.shortUrl}" target="_blank" class="hover:underline">${item.shortUrl}</a>
           </td>
           <td class="py-3 px-4 text-center">
-            <button onclick="openQrModal('${item.topic || item.title}', '${item.shortUrl}', '${item.qrCodeUrl}')" 
+            <button onclick="openQrModal('${item.topic}', '${item.shortUrl}', '${item.qrCodeUrl}')" 
                     class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-teal-600 transition" title="ดู QR Code">
               <i class="fa-solid fa-qrcode text-base"></i>
             </button>
@@ -520,38 +613,6 @@
           </td>
         </tr>
       `).join('');
-    }
-
-    function addHistoryRow(data) {
-      const tbody = document.getElementById('historyTableBody');
-      const emptyRow = tbody.querySelector('td[colspan="5"]');
-      if (emptyRow) tbody.innerHTML = '';
-
-      const topicText = data.topic || data.title || 'ไม่มีหัวข้อ';
-      const newRowHtml = `
-        <tr class="bg-teal-50/40 hover:bg-slate-50 transition">
-          <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">${data.timestamp || 'เมื่อสักครู่'}</td>
-          <td class="py-3 px-4 font-medium text-slate-800 text-xs max-w-[150px] truncate" title="${topicText}">${topicText}</td>
-          <td class="py-3 px-4 font-mono text-xs text-teal-600 font-semibold">
-            <a href="${data.shortUrl}" target="_blank" class="hover:underline">${data.shortUrl}</a>
-          </td>
-          <td class="py-3 px-4 text-center">
-            <button onclick="openQrModal('${topicText}', '${data.shortUrl}', '${data.qrCodeUrl}')" 
-                    class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-teal-600 transition" title="ดู QR Code">
-              <i class="fa-solid fa-qrcode text-base"></i>
-            </button>
-          </td>
-          <td class="py-3 px-4 text-center whitespace-nowrap">
-            <button onclick="copyDirect('${data.shortUrl}', this)" class="p-1.5 text-slate-500 hover:text-teal-600 transition mr-1" title="คัดลอกลิงก์">
-              <i class="fa-regular fa-copy"></i>
-            </button>
-            <a href="${data.shortUrl}" target="_blank" class="p-1.5 text-slate-500 hover:text-indigo-600 transition" title="เปิดลิงก์">
-              <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-            </a>
-          </td>
-        </tr>
-      `;
-      tbody.insertAdjacentHTML('afterbegin', newRowHtml);
     }
 
     // Modal QR Code

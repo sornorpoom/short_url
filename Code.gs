@@ -17,7 +17,8 @@ const SHEET_NAME = 'Sheet1'; // หรือชื่อแท็บที่ต
 function doGet(e) {
   // 1. หากมีพารามิเตอร์ action=getLinks ให้ส่งคืนประวัติล่าสุดเป็น JSON
   if (e && e.parameter && e.parameter.action === 'getLinks') {
-    const links = getRecentLinks(20);
+    const limit = parseInt(e.parameter.limit, 10) || 100;
+    const links = getRecentLinks(limit);
     return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: links }))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -278,8 +279,9 @@ function saveToGoogleSheet(data) {
 
 /**
  * ดึงรายการล่าสุดจาก Google Sheet เพื่อแสดงในประวัติบนหน้าเว็บ
+ * เรียงลำดับจาก "วันเดือนปีล่าสุด" ให้อยู่ลำดับแรกสุดเสมอ (Newest First)
  */
-function getRecentLinks(limit = 20) {
+function getRecentLinks(limit = 100) {
   try {
     const sheet = getTargetSheet();
     const lastRow = sheet.getLastRow();
@@ -292,16 +294,26 @@ function getRecentLinks(limit = 20) {
     const values = sheet.getRange(startRow, 1, numRows, 5).getValues();
 
     const links = [];
+    // วนลูปจากแถวล่างสุด (ข้อมูลที่เพิ่งเพิ่มล่าสุด) ย้อนกลับไปแถวแรก
     for (let i = values.length - 1; i >= 0 && links.length < limit; i--) {
       const row = values[i];
       if (row[2] || row[3]) { // ต้องมี Url หรือ Short Url
         const shortUrl = row[3] || row[2];
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shortUrl)}`;
+        
+        // จัดการฟอร์แมต Timestamp ให้เป็นข้อความที่อ่านง่าย
+        let timestampStr = '';
+        if (row[0] instanceof Date) {
+          timestampStr = Utilities.formatDate(row[0], 'Asia/Bangkok', 'dd/MM/yyyy HH:mm:ss');
+        } else {
+          timestampStr = String(row[0] || '');
+        }
+
         links.push({
-          timestamp: row[0],
-          topic: row[1] || 'ไม่มีหัวข้อ',
-          longUrl: row[2],
-          shortUrl: shortUrl,
+          timestamp: timestampStr,
+          topic: String(row[1] || 'ไม่มีหัวข้อ'),
+          longUrl: String(row[2] || ''),
+          shortUrl: String(shortUrl),
           qrCodeUrl: qrCodeUrl
         });
       }
